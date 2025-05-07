@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Online Lesson Recorder</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <h2>Live Video & Recording</h2>
+    <video id="webcamVideo" autoplay playsinline></video>
+
+    <div id="recordingTimer">00:00</div>
+
+    <div class="button-container">
+        <button id="startRecording" class="btn">Start Recording</button>
+        <button id="stopRecording" class="btn" disabled>Stop Recording</button>
+        <button id="captureImage" class="btn">Capture Image</button>
+    </div>
+
+    <h2>Upload Media</h2>
+    <div class="upload-options">
+        <label for="videoUpload" class="upload-label">
+            <i class="fas fa-video"></i>
+            <span>Upload Video</span>
+        </label>
+        <input type="file" id="videoUpload" accept="video/*" class="hidden" />
+        <label for="imageUpload" class="upload-label">
+            <i class="fas fa-images"></i>
+            <span>Upload Image</span>
+        </label>
+        <input type="file" id="imageUpload" accept="image/*" class="hidden" />
+    </div>
+
+    <div id="mediaGallery">
+        <h2>Recorded & Uploaded Videos</h2>
+        <div id="recordedVideosContainer"></div>
+
+        <h2>Uploaded & Captured Images</h2>
+        <div id="imagesContainer"></div>
+    </div>
+
+    <script>
+        const webcam = document.getElementById("webcamVideo");
+        const videoUpload = document.getElementById("videoUpload");
+        const imageUpload = document.getElementById("imageUpload");
+        const recordedVideosContainer = document.getElementById("recordedVideosContainer");
+        const imagesContainer = document.getElementById("imagesContainer");
+        const captureImageButton = document.getElementById("captureImage");
+        const recordingTimer = document.getElementById("recordingTimer");
+
+        let mediaRecorder;
+        let videoChunks = [];
+        let currentStream;
+        let timerInterval;
+        let secondsElapsed = 0;
+
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
+            const secs = (seconds % 60).toString().padStart(2, '0');
+            return `${mins}:${secs}`;
+        }
+
+        function startTimer() {
+            secondsElapsed = 0;
+            recordingTimer.textContent = formatTime(secondsElapsed);
+            recordingTimer.style.display = 'block';
+            timerInterval = setInterval(() => {
+                secondsElapsed++;
+                recordingTimer.textContent = formatTime(secondsElapsed);
+            }, 1000);
+        }
+
+        function stopTimer() {
+            clearInterval(timerInterval);
+            recordingTimer.style.display = 'none';
+        }
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then((stream) => {
+                currentStream = stream;
+                webcam.srcObject = stream;
+                mediaRecorder = new MediaRecorder(stream);
+
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        videoChunks.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onstop = () => {
+                    const videoBlob = new Blob(videoChunks, { type: "video/webm" });
+                    videoChunks = [];
+                    const videoUrl = URL.createObjectURL(videoBlob);
+                    const videoElement = document.createElement("video");
+                    videoElement.src = videoUrl;
+                    videoElement.controls = true;
+                    const videoWrapper = document.createElement("div");
+                    videoWrapper.classList.add("video-wrapper");
+                    videoWrapper.appendChild(videoElement);
+                    recordedVideosContainer.appendChild(videoWrapper);
+                };
+            });
+        document.getElementById("startRecording").onclick = () => {
+            mediaRecorder.start();
+            startTimer();
+            document.getElementById("startRecording").disabled = true;
+            document.getElementById("stopRecording").disabled = false;
+        };
+        document.getElementById("stopRecording").onclick = () => {
+            mediaRecorder.stop();
+            stopTimer();
+            document.getElementById("startRecording").disabled = false;
+            document.getElementById("stopRecording").disabled = true;
+        };
+        videoUpload.onchange = (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const videoUrl = URL.createObjectURL(file);
+                const videoElement = document.createElement("video");
+                videoElement.src = videoUrl;
+                videoElement.controls = true;
+                const videoWrapper = document.createElement("div");
+                videoWrapper.classList.add("video-wrapper");
+                videoWrapper.appendChild(videoElement);
+                recordedVideosContainer.appendChild(videoWrapper);
+            }
+        };
+        imageUpload.onchange = (event) => {
+            const files = Array.from(event.target.files);
+            files.forEach((file) => {
+                const imageUrl = URL.createObjectURL(file);
+                const imgElement = document.createElement("img");
+                imgElement.src = imageUrl;
+                const imageWrapper = document.createElement("div");
+                imageWrapper.classList.add("image-wrapper");
+                imageWrapper.appendChild(imgElement);
+                imagesContainer.appendChild(imageWrapper);
+            });
+        };
+        captureImageButton.onclick = () => {
+            const canvas = document.createElement("canvas");
+            const context = canvas.getContext("2d");
+            canvas.width = webcam.videoWidth;
+            canvas.height = webcam.videoHeight;
+            context.drawImage(webcam, 0, 0, canvas.width, canvas.height);
+
+            const imageUrl = canvas.toDataURL("image/png");
+
+            const imgElement = document.createElement("img");
+            imgElement.src = imageUrl;
+            const imageWrapper = document.createElement("div");
+            imageWrapper.classList.add("image-wrapper");
+            imageWrapper.appendChild(imgElement);
+            imagesContainer.appendChild(imageWrapper);
+        };
+    </script>
+</body>
+</html>
